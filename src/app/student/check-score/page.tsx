@@ -101,7 +101,7 @@ export default function CheckScorePage() {
 
         calculatedResults.push({
           // ✅ แก้ไขตรงนี้: exam_sessions เป็น Array ต้องเข้าถึง [0] ก่อน
-          sessionName: record.exam_sessions?.[0]?.session_name || "การสอบ",
+          sessionName: (record.exam_sessions as any[])?.[0]?.session_name || "การสอบ",
           date: new Date(record.end_time).toLocaleString("th-TH"),
           score: score.toFixed(1),
           correct: correctCount,
