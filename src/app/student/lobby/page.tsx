@@ -16,7 +16,7 @@ export default function LobbyPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      // 1. ดึงข้อมูลผู้ใช้ (แก้ Destructuring ให้ถูกต้อง)
+      // 1. ดึงข้อมูลผู้ใช้
       const result = await supabase.auth.getUser()
       const user = result.data?.user
       
@@ -29,7 +29,7 @@ export default function LobbyPage() {
         if (profileResult.data) setUserInfo(profileResult.data)
       }
 
-      // 2. ดึงข้อมูลตารางสอบ (แก้ Destructuring ให้ถูกต้อง)
+      // 2. ดึงข้อมูลตารางสอบ
       const sessionResult = await supabase
         .from("exam_sessions")
         .select("*")
@@ -169,12 +169,24 @@ export default function LobbyPage() {
         
         {/* Header */}
         <div className="bg-gradient-to-r from-teal-500 to-cyan-600 px-8 py-6 text-center relative">
-          <button 
-            onClick={handleLogout}
-            className="absolute top-4 right-4 text-white/80 hover:text-white text-sm px-3 py-1 rounded-full border border-white/30 hover:bg-white/10 transition-all"
-          >
-            ออกจากระบบ
-          </button>
+          {/* ✅ ปุ่มเมนูขวาบน: โปรไฟล์ และ ออกจากระบบ */}
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button 
+              onClick={() => router.push("/student/profile")}
+              className="text-white/90 hover:text-white text-sm px-3 py-1 rounded-full border border-white/30 hover:bg-white/10 transition-all flex items-center gap-1"
+              title="แก้ไขโปรไฟล์"
+            >
+              👤 โปรไฟล์
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="text-white/80 hover:text-white text-sm px-3 py-1 rounded-full border border-white/30 hover:bg-white/10 transition-all"
+              title="ออกจากระบบ"
+            >
+              ออกจากระบบ
+            </button>
+          </div>
+
           <h1 className="text-3xl font-bold text-white">ห้องรอสอบ</h1>
           <p className="text-teal-100 mt-2">{session.session_name}</p>
         </div>
@@ -184,13 +196,32 @@ export default function LobbyPage() {
           {userInfo && (
             <div className="bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-xl p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">👤 <span className="font-semibold text-teal-700">{userInfo.fullname}</span></p>
-                  <p className="text-sm text-gray-600">🎓 <span className="font-semibold text-teal-700">รหัส: {userInfo.student_id}</span></p>
+                <div className="flex items-center gap-4">
+                  {/* แสดงรูปโปรไฟล์ถ้ามี */}
+                  {userInfo.avatar_url ? (
+                    <img 
+                      src={userInfo.avatar_url} 
+                      alt="avatar" 
+                      className="w-12 h-12 rounded-full object-cover border-2 border-teal-400"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-full bg-teal-200 flex items-center justify-center text-teal-700 font-bold text-lg">
+                      {userInfo.fullname?.charAt(0) || "?"}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <p className="text-sm text-gray-600">👤 <span className="font-semibold text-teal-700">{userInfo.fullname}</span></p>
+                    {userInfo.nickname && (
+                      <p className="text-xs text-gray-500">ชื่อเล่น: {userInfo.nickname}</p>
+                    )}
+                    <p className="text-sm text-gray-600">🎓 <span className="font-semibold text-teal-700">รหัส: {userInfo.student_id}</span></p>
+                  </div>
                 </div>
+                
                 <div className="text-right">
                   <p className="text-xs text-gray-500">อีเมล</p>
-                  <p className="text-sm text-gray-700 truncate max-w-[200px]">{userInfo.email || "N/A"}</p>
+                  <p className="text-sm text-gray-700 truncate max-w-[150px]">{userInfo.email || "N/A"}</p>
                 </div>
               </div>
             </div>
@@ -220,7 +251,7 @@ export default function LobbyPage() {
               📜 ข้อควรปฏิบัติ
             </h3>
             <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
-              <li>ข้อสอบมีทั้งหมด 30 ข้อ (โค้ด 60%, ทฤษฎี 40%)</li>
+              <li>ข้อสอบมีทั้งหมด 35 ข้อ (ทฤษฎี 70%, โค้ด 30%)</li>
               <li>ระบบจะสุ่มตัวเลือกและเรียงลำดับไม่เหมือนกันในแต่ละคน</li>
               <li>ห้ามสลับหน้าจอ หรือออกจากหน้าเว็บ (ระบบอาจบันทึกการออก)</li>
               <li>เวลาหมด ระบบจะส่งคำตอบอัตโนมัติ</li>
