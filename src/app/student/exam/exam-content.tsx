@@ -93,8 +93,8 @@ export default function ExamContent() {
 
   const fetchAndShuffleQuestions = async () => {
     try {
-      const codeResult = await supabase.from("questions").select("*").eq("type", "code").limit(18)
-      const theoryResult = await supabase.from("questions").select("*").eq("type", "theory").limit(12)
+      const codeResult = await supabase.from("questions").select("*").eq("type", "code")
+      const theoryResult = await supabase.from("questions").select("*").eq("type", "theory")
       const allQuestions = [...(codeResult.data || []), ...(theoryResult.data || [])]
       if (allQuestions.length === 0) { alert("ไม่พบข้อสอบในระบบ"); router.push("/student/lobby"); return }
 
