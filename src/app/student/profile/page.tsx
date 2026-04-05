@@ -15,6 +15,7 @@ export default function ProfilePage() {
   const [nickname, setNickname] = useState("")
   const [studentId, setStudentId] = useState("")
   const [email, setEmail] = useState("")
+  const [avatarPath, setAvatarPath] = useState<string | null>(null)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -34,23 +35,35 @@ export default function ProfilePage() {
       setUserId(user.id)
       setEmail(user.email || "")
 
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("fullname, nickname, student_id, avatar_url")
         .eq("id", user.id)
         .single()
+
+      if (profileError) {
+        console.error("Profile fetch error:", profileError.message)
+      }
 
       if (profile) {
         setFullname(profile.fullname || "")
         setNickname(profile.nickname || "")
         setStudentId(profile.student_id || "")
         
-        // สร้าง Public URL จาก avatar_path
-        if (profile.avatar_url) {
-          const { data: urlData } = supabase.storage
+        const path = profile.avatar_url
+        setAvatarPath(path || null)
+        
+        if (path) {
+          // ✅ ใช้ createSignedUrl
+          const { data: signedUrlData, error: urlError } = await supabase.storage
             .from("avatars")
-            .getPublicUrl(profile.avatar_url)
-          setAvatarUrl(urlData?.publicUrl || null)
+            .createSignedUrl(path, 60 * 60 * 24 * 365)
+
+          if (urlError) {
+            console.error("Signed URL error:", urlError.message)
+          } else if (signedUrlData?.signedUrl) {
+            setAvatarUrl(signedUrlData.signedUrl)
+          }
         }
       }
     } catch (error) {
@@ -64,61 +77,57 @@ export default function ProfilePage() {
     try {
       setUploading(true)
       const file = e.target.files?.[0]
+      
       if (!file || !userId) return
 
-      // ตรวจสอบขนาดไฟล์ (ไม่เกิน 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert("ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB")
         return
       }
 
-      // ตรวจสอบประเภทไฟล์
       if (!file.type.startsWith("image/")) {
         alert("กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น")
         return
       }
 
-      // ลบไฟล์เก่าออก (ถ้ามี)
-      if (avatarUrl) {
-        const oldFileName = avatarUrl.split("/").pop()?.split("?")[0]
-        if (oldFileName) {
-          await supabase.storage.from("avatars").remove([oldFileName])
-        }
+      // ลบไฟล์เก่า (ถ้ามี)
+      if (avatarPath) {
+        await supabase.storage.from("avatars").remove([avatarPath])
       }
 
-      // สร้างชื่อไฟล์ใหม่
       const fileExt = file.name.split(".").pop()
       const fileName = `${userId}-${Date.now()}.${fileExt}`
 
-      // อัปโหลดไฟล์
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file, {
           cacheControl: "3600",
-          upsert: true
+          upsert: true,
         })
 
       if (uploadError) throw uploadError
 
-      // ✅ แก้ไข: getPublicUrl ไม่คืนค่า error
-      const { data: urlData } = supabase.storage
+      // ✅ สร้าง Signed URL
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("avatars")
-        .getPublicUrl(fileName)
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365)
 
-      const publicUrl = urlData?.publicUrl
+      if (signedUrlError) throw signedUrlError
 
-      if (!publicUrl) throw new Error("Failed to get public URL")
+      if (signedUrlData?.signedUrl) {
+        // บันทึก path ลงฐานข้อมูล
+        const { error: updateError } = await supabase
+          .from("profiles")
+          .update({ avatar_url: fileName })
+          .eq("id", userId)
 
-      // บันทึก path ลงฐานข้อมูล
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: fileName })
-        .eq("id", userId)
+        if (updateError) throw updateError
 
-      if (updateError) throw updateError
-
-      setAvatarUrl(publicUrl)
-      alert("อัปโหลดรูปโปรไฟล์สำเร็จ!")
+        setAvatarPath(fileName)
+        setAvatarUrl(signedUrlData.signedUrl)
+        
+        alert("อัปโหลดรูปโปรไฟล์สำเร็จ!")
+      }
     } catch (error) {
       console.error("Error uploading image:", error)
       alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
@@ -168,7 +177,6 @@ export default function ProfilePage() {
         </h1>
 
         <form onSubmit={handleSave} className="space-y-6">
-          {/* รูปโปรไฟล์ */}
           <div className="flex flex-col items-center">
             <div className="relative mb-4">
               {avatarUrl ? (
@@ -213,7 +221,6 @@ export default function ProfilePage() {
             <p className="text-xs text-gray-500 mt-2">ขนาดไฟล์ไม่เกิน 2MB</p>
           </div>
 
-          {/* ข้อมูลที่ไม่สามารถแก้ไขได้ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               รหัสนักศึกษา
@@ -238,7 +245,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* ข้อมูลที่แก้ไขได้ */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               ชื่อ-นามสกุล <span className="text-red-500">*</span>
@@ -266,7 +272,6 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* ปุ่มบันทึก */}
           <div className="flex gap-4 pt-4">
             <button
               type="submit"
