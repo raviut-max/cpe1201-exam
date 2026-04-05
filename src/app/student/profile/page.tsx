@@ -23,10 +23,16 @@ export default function ProfilePage() {
   }, [])
 
   const fetchProfile = async () => {
+    console.log("🔍 [DEBUG] Fetching profile...")
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const result = await supabase.auth.getUser()
+      console.log("📥 [DEBUG] getUser result:", result)
+      
+      const user = result.data?.user
+      console.log("👤 [DEBUG] User:", user)
 
       if (!user) {
+        console.log("⚠️ [DEBUG] No user found, redirecting to login")
         router.push("/student/login")
         return
       }
@@ -34,96 +40,168 @@ export default function ProfilePage() {
       setUserId(user.id)
       setEmail(user.email || "")
 
-      const { data: profile } = await supabase
+      console.log("📊 [DEBUG] Fetching profile from database...")
+      const profileResult = await supabase
         .from("profiles")
         .select("fullname, nickname, student_id, avatar_url")
         .eq("id", user.id)
         .single()
 
-      if (profile) {
-        setFullname(profile.fullname || "")
-        setNickname(profile.nickname || "")
-        setStudentId(profile.student_id || "")
+      console.log("📤 [DEBUG] Profile result:", profileResult)
+
+      if (profileResult.data) {
+        setFullname(profileResult.data.fullname || "")
+        setNickname(profileResult.data.nickname || "")
+        setStudentId(profileResult.data.student_id || "")
         
-        // สร้าง Public URL จาก avatar_path
-        if (profile.avatar_url) {
+        const avatarPath = profileResult.data.avatar_url
+        console.log("🖼️ [DEBUG] Avatar path from DB:", avatarPath)
+        
+        if (avatarPath) {
+          setAvatarUrl(avatarPath)
+          
+          // สร้าง Public URL
           const { data: urlData } = supabase.storage
             .from("avatars")
-            .getPublicUrl(profile.avatar_url)
-          setAvatarUrl(urlData?.publicUrl || null)
+            .getPublicUrl(avatarPath)
+          
+          console.log("🔗 [DEBUG] Public URL data:", urlData)
+          console.log("🌐 [DEBUG] Public URL:", urlData?.publicUrl)
         }
       }
     } catch (error) {
-      console.error("Error fetching profile:", error)
+      console.error("❌ [DEBUG] Error fetching profile:", error)
     } finally {
       setLoading(false)
     }
   }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log("📸 [DEBUG] handleImageUpload triggered")
+    
     try {
       setUploading(true)
+      console.log("⏳ [DEBUG] Set uploading to true")
+      
       const file = e.target.files?.[0]
-      if (!file || !userId) return
+      console.log("📁 [DEBUG] Selected file:", file)
+      console.log("📁 [DEBUG] File name:", file?.name)
+      console.log("📁 [DEBUG] File size:", file?.size)
+      console.log("📁 [DEBUG] File type:", file?.type)
+      
+      if (!file) {
+        console.log("❌ [DEBUG] No file selected")
+        alert("ไม่พบไฟล์ที่เลือก")
+        return
+      }
+      
+      if (!userId) {
+        console.log("❌ [DEBUG] No user ID")
+        alert("ไม่พบข้อมูลผู้ใช้")
+        return
+      }
 
-      // ตรวจสอบขนาดไฟล์ (ไม่เกิน 2MB)
+      // ตรวจสอบขนาดไฟล์
       if (file.size > 2 * 1024 * 1024) {
+        console.log("❌ [DEBUG] File too large:", file.size)
         alert("ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB")
         return
       }
+      console.log("✅ [DEBUG] File size OK")
 
       // ตรวจสอบประเภทไฟล์
       if (!file.type.startsWith("image/")) {
+        console.log("❌ [DEBUG] Invalid file type:", file.type)
         alert("กรุณาอัปโหลดไฟล์รูปภาพเท่านั้น")
         return
       }
+      console.log("✅ [DEBUG] File type OK")
 
       // ลบไฟล์เก่าออก (ถ้ามี)
       if (avatarUrl) {
-        const oldFileName = avatarUrl.split("/").pop()
-        if (oldFileName) {
-          await supabase.storage.from("avatars").remove([oldFileName])
+        console.log("🗑️ [DEBUG] Removing old file:", avatarUrl)
+        const { error: removeError } = await supabase.storage
+          .from("avatars")
+          .remove([avatarUrl])
+        
+        if (removeError) {
+          console.log("⚠️ [DEBUG] Error removing old file:", removeError)
+        } else {
+          console.log("✅ [DEBUG] Old file removed successfully")
         }
       }
 
       // สร้างชื่อไฟล์ใหม่
       const fileExt = file.name.split(".").pop()
       const fileName = `${userId}-${Date.now()}.${fileExt}`
+      console.log("📝 [DEBUG] Generated file name:", fileName)
 
       // อัปโหลดไฟล์
-      const { error: uploadError } = await supabase.storage
+      console.log("📤 [DEBUG] Starting upload to bucket 'avatars'...")
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(fileName, file, {
           cacheControl: "3600",
-          upsert: true
+          upsert: true,
         })
 
-      if (uploadError) throw uploadError
+      console.log("📥 [DEBUG] Upload response:", { uploadData, uploadError })
+
+      if (uploadError) {
+        console.error("❌ [DEBUG] Upload error:", uploadError)
+        throw uploadError
+      }
+
+      console.log("✅ [DEBUG] Upload successful!")
 
       // สร้าง Public URL
-      const { data: urlData } = supabase.storage
+      console.log("🔗 [DEBUG] Getting public URL...")
+      const { data: urlData, error: urlError } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName)
 
-      const publicUrl = urlData?.publicUrl
+      console.log("📥 [DEBUG] Public URL response:", { urlData, urlError })
 
-      if (!publicUrl) throw new Error("Failed to get public URL")
+      if (urlError) {
+        console.error("❌ [DEBUG] URL error:", urlError)
+        throw urlError
+      }
+
+      const publicUrl = urlData?.publicUrl
+      console.log("🌐 [DEBUG] Public URL:", publicUrl)
+
+      if (!publicUrl) {
+        console.error("❌ [DEBUG] No public URL returned")
+        throw new Error("Failed to get public URL")
+      }
 
       // บันทึก path ลงฐานข้อมูล
+      console.log("💾 [DEBUG] Saving to database...")
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ avatar_url: fileName })
         .eq("id", userId)
 
-      if (updateError) throw updateError
+      console.log("📥 [DEBUG] Database update response:", { updateError })
 
-      setAvatarUrl(publicUrl)
+      if (updateError) {
+        console.error("❌ [DEBUG] Database update error:", updateError)
+        throw updateError
+      }
+
+      console.log("✅ [DEBUG] Database updated successfully")
+
+      setAvatarUrl(fileName)
+      console.log("✅ [DEBUG] Avatar URL state updated")
+
       alert("อัปโหลดรูปโปรไฟล์สำเร็จ!")
+      console.log("🎉 [DEBUG] Upload process completed successfully")
     } catch (error) {
-      console.error("Error uploading image:", error)
-      alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ")
+      console.error("❌ [DEBUG] Error in handleImageUpload:", error)
+      alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: " + error)
     } finally {
       setUploading(false)
+      console.log("⏹️ [DEBUG] Set uploading to false")
     }
   }
 
@@ -173,11 +251,11 @@ export default function ProfilePage() {
             <div className="relative mb-4">
               {avatarUrl ? (
                 <img
-                  src={avatarUrl}
+                  src={supabase.storage.from("avatars").getPublicUrl(avatarUrl).data?.publicUrl}
                   alt="Profile"
                   className="w-32 h-32 rounded-full object-cover border-4 border-teal-500 shadow-lg"
                   onError={(e) => {
-                    console.error("Failed to load image")
+                    console.error("❌ [DEBUG] Failed to load image")
                     e.currentTarget.src = ""
                   }}
                 />
