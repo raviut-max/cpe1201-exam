@@ -83,16 +83,16 @@ export default function ProfilePage() {
       //const publicUrlResult = supabase.storage.from('avatars').getPublicUrl(filePath)
       //const publicUrl = publicUrlResult.data?.publicUrl
 
-      if (!publicUrl) throw new Error("Failed to get public URL")
+      //if (!publicUrl) throw new Error("Failed to get public URL")
 
       const { error: updateError } = await supabase
         .from("profiles")
-        .update({ avatar_url: publicUrl })
+        .update({ avatar_url: filePath })
         .eq("id", userId)
 
       if (updateError) throw updateError
 
-      setAvatarUrl(publicUrl)
+      setAvatarUrl(filePath)
       alert("อัปโหลดรูปโปรไฟล์สำเร็จ!")
     } catch (error) {
       console.error("Error uploading image:", error)
