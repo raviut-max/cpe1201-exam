@@ -28,7 +28,6 @@ export default function ProfileImagePage() {
     addDebug("🔍 Initializing page...")
     
     try {
-      // ✅ แก้ไข: ใช้ destructuring ให้ถูกต้อง
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
