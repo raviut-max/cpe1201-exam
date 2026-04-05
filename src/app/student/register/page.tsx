@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase"
 export default function RegisterPage() {
   const [studentId, setStudentId] = useState("")
   const [fullname, setFullname] = useState("")
+  const [nickname, setNickname] = useState("") // ✅ เพิ่ม state สำหรับชื่อเล่น
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -32,6 +33,7 @@ export default function RegisterPage() {
 
     setLoading(true)
 
+    // 1. สมัครสมาชิกใน Supabase Auth
     const { error: authError, data } = await supabase.auth.signUp({ 
       email, 
       password,
@@ -44,10 +46,12 @@ export default function RegisterPage() {
     }
 
     if (data.user) {
+      // 2. บันทึกรหัสนักศึกษา + ชื่อ + ชื่อเล่น + Email ลงตาราง profiles
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         student_id: studentId,
         fullname,
+        nickname, // ✅ เพิ่มชื่อเล่น
         email,
         role: "student"
       })
@@ -108,6 +112,18 @@ export default function RegisterPage() {
                 value={fullname}
                 onChange={(e) => setFullname(e.target.value)}
                 required 
+              />
+            </div>
+
+            {/* ✅ เพิ่มช่องชื่อเล่น */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">ชื่อเล่น</label>
+              <input 
+                type="text"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all bg-gray-50 focus:bg-white"
+                placeholder="ตัวอย่าง: ชาย (ถ้ามี)"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
               />
             </div>
 
