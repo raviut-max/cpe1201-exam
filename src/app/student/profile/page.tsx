@@ -16,11 +16,18 @@ export default function ProfilePage() {
   const [studentId, setStudentId] = useState("")
   const [email, setEmail] = useState("")
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [avatarPublicUrl, setAvatarPublicUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchProfile()
   }, [])
+
+  // 获取头像的公开URL
+  const getPublicUrl = (path: string) => {
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    return data.publicUrl
+  }
 
   const fetchProfile = async () => {
     try {
@@ -45,7 +52,14 @@ export default function ProfilePage() {
         setFullname(profileResult.data.fullname || "")
         setNickname(profileResult.data.nickname || "")
         setStudentId(profileResult.data.student_id || "")
-        setAvatarUrl(profileResult.data.avatar_url)
+        
+        const avatarPath = profileResult.data.avatar_url
+        setAvatarUrl(avatarPath)
+        
+        // 如果有头像路径，获取公开URL
+        if (avatarPath) {
+          setAvatarPublicUrl(getPublicUrl(avatarPath))
+        }
       }
     } catch (error) {
       console.error("Error fetching profile:", error)
@@ -70,20 +84,20 @@ export default function ProfilePage() {
         return
       }
 
+      // 先删除旧头像（如果有）
+      if (avatarUrl) {
+        await supabase.storage.from('avatars').remove([avatarUrl])
+      }
+
       const fileExt = file.name.split('.').pop()
       const fileName = `${userId}-${Date.now()}.${fileExt}`
-      const filePath = `${fileName}`
+      const filePath = fileName
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(filePath, file)
 
       if (uploadError) throw uploadError
-
-      //const publicUrlResult = supabase.storage.from('avatars').getPublicUrl(filePath)
-      //const publicUrl = publicUrlResult.data?.publicUrl
-
-      //if (!publicUrl) throw new Error("Failed to get public URL")
 
       const { error: updateError } = await supabase
         .from("profiles")
@@ -92,7 +106,10 @@ export default function ProfilePage() {
 
       if (updateError) throw updateError
 
+      // 更新公开URL
       setAvatarUrl(filePath)
+      setAvatarPublicUrl(getPublicUrl(filePath))
+      
       alert("อัปโหลดรูปโปรไฟล์สำเร็จ!")
     } catch (error) {
       console.error("Error uploading image:", error)
@@ -144,11 +161,23 @@ export default function ProfilePage() {
         <form onSubmit={handleSave} className="space-y-6">
           <div className="flex flex-col items-center">
             <div className="relative mb-4">
-              {avatarUrl ? (
+              {avatarPublicUrl ? (
                 <img
-                  src={avatarUrl}
+                  src={avatarPublicUrl}
                   alt="Profile"
                   className="w-32 h-32 rounded-full object-cover border-4 border-teal-500 shadow-lg"
+                  onError={(e) => {
+                    // 如果图片加载失败，显示默认头像
+                    e.currentTarget.style.display = 'none'
+                    const parent = e.currentTarget.parentElement
+                    if (parent) {
+                      const defaultDiv = document.createElement('div')
+                      defaultDiv.className = "w-32 h-32 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-4xl font-bold border-4 border-teal-500 shadow-lg"
+                      defaultDiv.textContent = fullname.charAt(0) || "?"
+                      parent.appendChild(defaultDiv)
+                      e.currentTarget.remove()
+                    }
+                  }}
                 />
               ) : (
                 <div className="w-32 h-32 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-white text-4xl font-bold border-4 border-teal-500 shadow-lg">
